@@ -146,7 +146,7 @@ export function startGame(room) {
   if (room.started) return { error: 'Game already started.' };
   if (room.players.length < room.minPlayers) return { error: `Need at least ${room.minPlayers} players.` };
   const humans = room.players.filter((p) => !p.isBot);
-  if (humans.some((p) => !p.ready)) return { error: 'Not everyone is ready.' };
+  if (humans.some((p) => !p.isHost && !p.ready)) return { error: 'Not everyone is ready.' };
   room.started = true;
   assignRoles(room.players);
   room.announcement = 'Roles are being assigned...';
