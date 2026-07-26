@@ -125,7 +125,8 @@ export function leaveRoom(socket) {
     if (idx === -1) continue;
     const p = room.players[idx];
     addSystemMessage(room, `${p.name} left.`);
-    if (p.isHost && !p.isBot) {
+    const wasHost = p.isHost && !p.isBot;
+    if (wasHost) {
       const nextHuman = room.players.find((x) => !x.isBot && x.id !== p.id);
       if (nextHuman) {
         room.hostId = nextHuman.id;
@@ -136,6 +137,8 @@ export function leaveRoom(socket) {
     if (room.players.length === 0) {
       clearTimers(room);
       rooms.delete(room.id);
+    } else if (room.started && wasHost) {
+      resetToLobby(room);
     } else {
       broadcast(room);
     }
@@ -194,6 +197,7 @@ function resolveNight(room) {
     addSystemMessage(room, '🌙 Nobody died tonight.');
   }
   setPhase(room, PHASES.NIGHT_OUTCOME);
+  if (checkEnd(room)) return;
   schedulePhaseEnd(room, () => beginDay(room));
 }
 
@@ -242,15 +246,18 @@ function resolveVote(room) {
 function checkEnd(room) {
   const alive = room.players.filter((p) => p.alive);
   const terrorist = alive.find((p) => p.role === ROLES.TERRORIST);
-  const villagers = alive.filter((p) => p.role !== ROLES.TERRORIST);
   if (!terrorist) {
     room.winner = { side: 'villagers', text: 'The Terrorist is dead. The village wins!' };
     setPhase(room, PHASES.GAME_OVER);
+    clearTimers(room);
+    broadcast(room);
     return true;
   }
   if (alive.length <= 3) {
     room.winner = { side: 'terrorist', text: 'The Terrorist outlasted the village.' };
     setPhase(room, PHASES.GAME_OVER);
+    clearTimers(room);
+    broadcast(room);
     return true;
   }
   return false;
@@ -473,7 +480,7 @@ function publicState(room, playerId) {
       connected: p.connected,
       ready: p.ready,
       alive: p.alive,
-      role: publicRole(p),
+      role: publicRole(p, room.winner !== null),
       hasVoted: p.hasVoted,
     })),
     messages: room.messages,
@@ -506,7 +513,7 @@ function personalState(room, playerId) {
   };
 }
 
-function publicRole(p) {
-  if (!p.alive) return p.role;
+function publicRole(p, revealAll = false) {
+  if (!p.alive || revealAll) return p.role;
   return null;
 }
