@@ -152,8 +152,7 @@ export function startGame(room) {
   if (humans.some((p) => !p.isHost && !p.ready)) return { error: 'Not everyone is ready.' };
   room.started = true;
   assignRoles(room.players);
-  room.announcement = 'Roles are being assigned...';
-  schedule(room, () => beginNight(room), DURATIONS[PHASES.ROLE_REVEAL] || 3000);
+  beginNight(room);
   broadcast(room);
   return { ok: true };
 }
