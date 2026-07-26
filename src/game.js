@@ -153,7 +153,6 @@ export function startGame(room) {
   room.started = true;
   assignRoles(room.players);
   beginNight(room);
-  broadcast(room);
   return { ok: true };
 }
 
@@ -175,6 +174,7 @@ function beginNight(room) {
   room.nightAction = { kill: null, save: null, killChosen: null, saveChosen: null };
   scheduleBotAction(room, PHASES.NIGHT_TERRORIST);
   schedulePhaseEnd(room, () => beginDoctor(room));
+  broadcast(room);
 }
 
 function beginDoctor(room) {
@@ -182,6 +182,7 @@ function beginDoctor(room) {
   setPhase(room, PHASES.NIGHT_DOCTOR);
   scheduleBotAction(room, PHASES.NIGHT_DOCTOR);
   schedulePhaseEnd(room, () => resolveNight(room));
+  broadcast(room);
 }
 
 function resolveNight(room) {
@@ -197,6 +198,7 @@ function resolveNight(room) {
   }
   setPhase(room, PHASES.NIGHT_OUTCOME);
   if (checkEnd(room)) return;
+  broadcast(room);
   schedulePhaseEnd(room, () => beginDay(room));
 }
 
@@ -208,6 +210,7 @@ function beginDay(room) {
   room.players.forEach((p) => (p.hasVoted = false));
   scheduleBotChat(room);
   schedulePhaseEnd(room, () => beginVoting(room));
+  broadcast(room);
 }
 
 function beginVoting(room) {
@@ -215,6 +218,7 @@ function beginVoting(room) {
   setPhase(room, PHASES.VOTING);
   scheduleBotVote(room);
   schedulePhaseEnd(room, () => resolveVote(room));
+  broadcast(room);
 }
 
 function resolveVote(room) {
@@ -239,6 +243,7 @@ function resolveVote(room) {
   }
   setPhase(room, PHASES.VOTE_RESULT);
   if (checkEnd(room)) return;
+  broadcast(room);
   schedulePhaseEnd(room, () => beginNight(room));
 }
 
