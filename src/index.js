@@ -12,6 +12,7 @@ import {
   createRoom,
   getRoom,
   joinRoom,
+  disconnectPlayer,
   leaveRoom,
   removeBots,
   resetToLobby,
@@ -127,7 +128,7 @@ io.on('connection', (socket) => {
   socket.on('chat:typing', withRoom(null, (room, { isTyping }) => setTyping(room, socket.id, isTyping)));
 
   socket.on('room:leave', () => leaveRoom(socket));
-  socket.on('disconnect', () => leaveRoom(socket));
+  socket.on('disconnect', () => disconnectPlayer(socket));
 });
 
 function localIps() {

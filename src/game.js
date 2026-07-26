@@ -52,6 +52,7 @@ export function createRoom(socket, name) {
     announcement: null,
     phaseEndsAt: null,
     timers: [],
+    idleTimeout: null,
     typing: [],
   };
   addPlayer(room, socket, name, true);
@@ -63,13 +64,23 @@ export function createRoom(socket, name) {
 export function joinRoom(socket, roomId, name) {
   const room = getRoom(roomId);
   if (!room) return { error: 'Room not found.' };
-  if (room.started) return { error: 'Game already started.' };
-  if (room.players.length >= room.maxPlayers) return { error: 'Room is full.' };
   const already = room.players.find((p) => p.id === socket.id);
   if (already) return { room };
-  if (room.players.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
-    return { error: 'That name is already taken in this room.' };
+  const existing = room.players.find((p) => p.name.toLowerCase() === name.toLowerCase());
+  if (existing) {
+    if (existing.connected) return { error: 'That name is already taken in this room.' };
+    existing.id = socket.id;
+    existing.socket = socket;
+    existing.connected = true;
+    if (existing.isHost) room.hostId = socket.id;
+    clearIdleTimeout(room);
+    addSystemMessage(room, `${existing.name} reconnected.`);
+    socket.join(room.id);
+    broadcast(room);
+    return { room };
   }
+  if (room.started) return { error: 'Game already started.' };
+  if (room.players.length >= room.maxPlayers) return { error: 'Room is full.' };
   addPlayer(room, socket, name, false);
   socket.join(room.id);
   broadcast(room);
@@ -119,6 +130,42 @@ export function setReady(room, playerId, ready) {
   }
 }
 
+export function disconnectPlayer(socket) {
+  for (const room of rooms.values()) {
+    const idx = room.players.findIndex((p) => p.id === socket.id);
+    if (idx === -1) continue;
+    const p = room.players[idx];
+    p.connected = false;
+    p.socket = null;
+    addSystemMessage(room, `${p.name} disconnected.`);
+    broadcast(room);
+    startIdleTimeout(room);
+    return;
+  }
+}
+
+function startIdleTimeout(room) {
+  clearIdleTimeout(room);
+  const hasConnected = room.players.some((p) => !p.isBot && p.connected);
+  if (!hasConnected) {
+    room.idleTimeout = setTimeout(() => {
+      if (!rooms.has(room.id)) return;
+      const stillNoConnected = !room.players.some((p) => !p.isBot && p.connected);
+      if (stillNoConnected) {
+        clearTimers(room);
+        rooms.delete(room.id);
+      }
+    }, 2 * 60 * 1000);
+  }
+}
+
+function clearIdleTimeout(room) {
+  if (room.idleTimeout) {
+    clearTimeout(room.idleTimeout);
+    room.idleTimeout = null;
+  }
+}
+
 export function leaveRoom(socket) {
   for (const room of rooms.values()) {
     const idx = room.players.findIndex((p) => p.id === socket.id);
@@ -127,7 +174,7 @@ export function leaveRoom(socket) {
     addSystemMessage(room, `${p.name} left.`);
     const wasHost = p.isHost && !p.isBot;
     if (wasHost) {
-      const nextHuman = room.players.find((x) => !x.isBot && x.id !== p.id);
+      const nextHuman = room.players.find((x) => !x.isBot && x.id !== p.id && x.connected);
       if (nextHuman) {
         room.hostId = nextHuman.id;
         nextHuman.isHost = true;
@@ -135,12 +182,15 @@ export function leaveRoom(socket) {
     }
     room.players.splice(idx, 1);
     if (room.players.length === 0) {
+      clearIdleTimeout(room);
       clearTimers(room);
       rooms.delete(room.id);
     } else if (room.started && wasHost) {
       resetToLobby(room);
+      startIdleTimeout(room);
     } else {
       broadcast(room);
+      startIdleTimeout(room);
     }
   }
 }
@@ -355,6 +405,7 @@ export function resetToLobby(room) {
   room.announcement = null;
   room.typing = [];
   broadcast(room);
+  startIdleTimeout(room);
 }
 
 function setPhase(room, phase) {
