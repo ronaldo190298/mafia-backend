@@ -367,10 +367,6 @@ function clearTimers(room) {
   room.timers = [];
 }
 
-function scheduleBotAction(phase) {
-  // placeholder; bot action handlers inline
-}
-
 function scheduleBotAction(room, phase) {
   const delay = 2000 + Math.random() * 3000;
   setTimeout(() => {
