@@ -37,7 +37,11 @@ export function sendRoomCreatedEmail(roomId, ownerName) {
     to: NOTIFY_EMAIL,
     subject: `New Mafia room created: ${roomId}`,
     text: `A new game room was created.\n\nRoom ID: ${roomId}\nOwner: ${ownerName}`,
-  }).catch((err) => {
-    console.error(`[mafia] failed to send room-created email for ${roomId}:`, err.message);
-  });
+  })
+    .then((info) => {
+      console.log(`[mafia] room-created email sent for ${roomId}:`, info.messageId);
+    })
+    .catch((err) => {
+      console.error(`[mafia] failed to send room-created email for ${roomId}:`, err.message);
+    });
 }
