@@ -19,6 +19,9 @@ function getTransporter() {
     secure: SMTP_SECURE,
     requireTLS: !SMTP_SECURE,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    family: 4,
   });
   transporter.verify((err) => {
     if (err) {
