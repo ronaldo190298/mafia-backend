@@ -7,6 +7,7 @@ import {
   botVoteChoice,
 } from './bots.js';
 import { DURATIONS, MAX_PLAYERS, MIN_PLAYERS, PHASES, ROLES } from './constants.js';
+import { sendRoomCreatedEmail } from './email.js';
 
 const rooms = new Map();
 let io;
@@ -58,6 +59,7 @@ export function createRoom(socket, name) {
   addPlayer(room, socket, name, true);
   rooms.set(id, room);
   socket.join(id);
+  sendRoomCreatedEmail(id, name);
   return room;
 }
 
