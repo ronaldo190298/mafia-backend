@@ -1,12 +1,13 @@
 import nodemailer from 'nodemailer';
 
-const NOTIFY_EMAIL = 'lampardronalo1@gmail.com';
+const NOTIFY_EMAIL = 'lampardronaldo1@gmail.com';
 
 const SMTP_HOST = 'smtp.gmail.com';
 const SMTP_PORT = 587;
 const SMTP_USER = 'lampardronaldo1@gmail.com';
-const SMTP_PASS = 'obcn jdxs luab hszk';
+const SMTP_PASS = 'obcnjdxsluabhszk';
 const SMTP_FROM = 'lampardronaldo1@gmail.com';
+const SMTP_SECURE = SMTP_PORT === 465;
 
 let transporter = null;
 
@@ -15,8 +16,16 @@ function getTransporter() {
   transporter = nodemailer.createTransport({
     host: SMTP_HOST,
     port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
+    secure: SMTP_SECURE,
+    requireTLS: !SMTP_SECURE,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+  transporter.verify((err) => {
+    if (err) {
+      console.error('[mafia] SMTP transporter verification failed:', err.message);
+    } else {
+      console.log('[mafia] SMTP transporter ready.');
+    }
   });
   return transporter;
 }
