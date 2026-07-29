@@ -6,7 +6,7 @@ const SMTP_HOST = 'smtp.gmail.com';
 const SMTP_PORT = 587;
 const SMTP_USER = 'lampardronaldo1@gmail.com';
 const SMTP_PASS = 'obcn jdxs luab hszk';
-const SMTP_FROM = 'lampardronaldo1@gmail.com>';
+const SMTP_FROM = 'lampardronaldo1@gmail.com';
 
 let transporter = null;
 
