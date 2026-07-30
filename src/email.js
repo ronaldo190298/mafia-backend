@@ -14,10 +14,7 @@ let transporter = null;
 function getTransporter() {
   if (transporter) return transporter;
   transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_SECURE,
-    requireTLS: !SMTP_SECURE,
+    service: 'gmail',
     auth: { user: SMTP_USER, pass: SMTP_PASS },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
