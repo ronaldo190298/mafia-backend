@@ -15,44 +15,56 @@ const EMAIL_API_KEY = process.env.SENDGRID_API_KEY || process.env.RESEND_API_KEY
 const EMAIL_PROVIDER = process.env.EMAIL_PROVIDER || 'sendgrid'; // 'sendgrid' | 'resend'
 const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_FROM;
 
+// Try 465 (SSL) first, then 587 (STARTTLS): some hosts block one but not the other.
+const SMTP_PORTS = [465, 587];
+
 let transporter = null;
-let transporterHost = null;
 
-async function getTransporter() {
-  if (transporter) return transporter;
-
-  let host = SMTP_HOST;
+async function resolveIPv4Host() {
   try {
     const addresses = await resolve4(SMTP_HOST);
     if (addresses.length) {
-      host = addresses[0];
-      transporterHost = host;
-      console.log(`[mafia] resolved ${SMTP_HOST} to IPv4 ${host}`);
+      console.log(`[mafia] resolved ${SMTP_HOST} to IPv4 ${addresses[0]}`);
+      return addresses[0];
     }
   } catch (err) {
     console.warn(`[mafia] could not resolve IPv4 for ${SMTP_HOST}:`, err.message);
   }
+  return SMTP_HOST;
+}
 
-  transporter = nodemailer.createTransport({
+function createTransporterForPort(host, port) {
+  return nodemailer.createTransport({
     host,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
-    requireTLS: SMTP_PORT !== 465,
+    port,
+    secure: port === 465,
+    requireTLS: port !== 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
     tls: { servername: SMTP_HOST },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
   });
+}
 
-  transporter.verify((err) => {
-    if (err) {
-      console.error('[mafia] SMTP transporter verification failed:', err.message);
-    } else {
-      console.log('[mafia] SMTP transporter ready.');
+async function getTransporter() {
+  if (transporter) return transporter;
+
+  const host = await resolveIPv4Host();
+
+  for (const port of SMTP_PORTS) {
+    const candidate = createTransporterForPort(host, port);
+    try {
+      await candidate.verify();
+      console.log(`[mafia] SMTP transporter ready on port ${port}.`);
+      transporter = candidate;
+      return transporter;
+    } catch (err) {
+      console.error(`[mafia] SMTP verification failed on port ${port}:`, err.message);
+      candidate.close();
     }
-  });
+  }
 
-  return transporter;
+  throw new Error(`SMTP unreachable on ports ${SMTP_PORTS.join(', ')} - the host likely blocks outbound SMTP`);
 }
 
 export async function sendRoomCreatedEmail(roomId, ownerName) {
