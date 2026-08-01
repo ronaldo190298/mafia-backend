@@ -11,8 +11,9 @@ const SMTP_FROM = 'lampardronaldo1@gmail.com';
 
 // Railway blocks outbound SMTP and has no IPv6, so use SendGrid/Resend/etc. over HTTPS in prod.
 // To keep using SMTP, the transport resolves the host to an IPv4 address and uses SNI.
-const EMAIL_API_KEY = process.env.SENDGRID_API_KEY || process.env.RESEND_API_KEY || '';
-const EMAIL_PROVIDER = process.env.EMAIL_PROVIDER || 'sendgrid'; // 'sendgrid' | 'resend'
+const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_FROM;
 
 // Try 465 (SSL) first, then 587 (STARTTLS): some hosts block one but not the other.
@@ -68,15 +69,44 @@ async function getTransporter() {
 }
 
 export async function sendRoomCreatedEmail(roomId, ownerName) {
-  if (EMAIL_API_KEY) {
-    if (EMAIL_PROVIDER === 'resend') {
-      return sendViaResend(roomId, ownerName);
-    }
+  if (BREVO_API_KEY) {
+    return sendViaBrevo(roomId, ownerName);
+  }
+  if (RESEND_API_KEY) {
+    return sendViaResend(roomId, ownerName);
+  }
+  if (SENDGRID_API_KEY) {
     return sendViaSendGrid(roomId, ownerName);
   }
 
-  console.warn('[mafia] EMAIL_API_KEY not set; falling back to SMTP (may fail on Railway)');
+  console.warn('[mafia] no email API key set (BREVO_API_KEY / RESEND_API_KEY / SENDGRID_API_KEY); falling back to SMTP (may fail on Railway)');
   return sendViaSmtp(roomId, ownerName);
+}
+
+async function sendViaBrevo(roomId, ownerName) {
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: { name: 'Mafia Game', email: EMAIL_FROM },
+        to: [{ email: NOTIFY_EMAIL }],
+        subject: `New Mafia room created: ${roomId}`,
+        textContent: `A new game room was created.\n\nRoom ID: ${roomId}\nOwner: ${ownerName}`,
+      }),
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Brevo HTTP ${response.status}: ${errText}`);
+    }
+    const data = await response.json().catch(() => ({}));
+    console.log(`[mafia] room-created email sent for ${roomId} via Brevo:`, data.messageId || 'ok');
+  } catch (err) {
+    console.error(`[mafia] failed to send room-created email for ${roomId} via Brevo:`, err.message);
+  }
 }
 
 async function sendViaSmtp(roomId, ownerName) {
@@ -100,7 +130,7 @@ async function sendViaSendGrid(roomId, ownerName) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${EMAIL_API_KEY}`,
+        Authorization: `Bearer ${SENDGRID_API_KEY}`,
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: NOTIFY_EMAIL }] }],
@@ -125,10 +155,10 @@ async function sendViaResend(roomId, ownerName) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${EMAIL_API_KEY}`,
+        Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: EMAIL_FROM,
+        from: process.env.EMAIL_FROM || 'Mafia Game <onboarding@resend.dev>',
         to: [NOTIFY_EMAIL],
         subject: `New Mafia room created: ${roomId}`,
         text: `A new game room was created.\n\nRoom ID: ${roomId}\nOwner: ${ownerName}`,
